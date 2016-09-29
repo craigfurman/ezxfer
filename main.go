@@ -21,6 +21,7 @@ func main() {
 	flag.Parse()
 
 	if *serverPort != 0 {
+		logger.SetPrefix("[ezxfer server] ")
 		logger.Println("-serveOnPort is set, starting in server mode")
 		srv := server.Server{Port: *serverPort, Logger: logger}
 		if err := srv.ServeTCP(); err != nil {

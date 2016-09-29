@@ -42,8 +42,8 @@ var _ = Describe("transferring files", func() {
 	})
 
 	AfterEach(func() {
+		Eventually(serverProcess.Kill()).Should(gexec.Exit())
 		Expect(os.RemoveAll(tempDir)).To(Succeed())
-		Expect(serverProcess.Kill()).To(gexec.Exit())
 	})
 
 	It("transfers files", func() {
