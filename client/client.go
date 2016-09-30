@@ -17,6 +17,19 @@ func SendFile(filePath, address string) error {
 	tarStream := tar.NewWriter(conn)
 	defer tarStream.Close()
 
+	info, err := os.Stat(filePath)
+	if err != nil {
+		return err
+	}
+
+	if info.IsDir() {
+		return handleDirectory(filePath, tarStream)
+	}
+
+	return handleSingleFile(filepath.Dir(filePath), filePath, tarStream)
+}
+
+func handleSingleFile(basePath string, filePath string, tarStream *tar.Writer) error {
 	file, err := os.Open(filePath)
 	if err != nil {
 		return err
@@ -27,10 +40,16 @@ func SendFile(filePath, address string) error {
 	if err != nil {
 		return err
 	}
-	header, err := tar.FileInfoHeader(fileInfo, filepath.Base(filePath))
+	relativePath, err := filepath.Rel(basePath, filePath)
 	if err != nil {
 		return err
 	}
+
+	header, err := tar.FileInfoHeader(fileInfo, "I am not needed")
+	if err != nil {
+		return err
+	}
+	header.Name = relativePath
 	if err := tarStream.WriteHeader(header); err != nil {
 		return err
 	}
@@ -40,4 +59,18 @@ func SendFile(filePath, address string) error {
 	}
 
 	return nil
+}
+
+func handleDirectory(filePath string, tarStream *tar.Writer) error {
+	return filepath.Walk(filePath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if info.IsDir() {
+			return nil
+		}
+
+		return handleSingleFile(filePath, path, tarStream)
+	})
 }

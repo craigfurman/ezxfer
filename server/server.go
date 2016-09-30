@@ -40,25 +40,35 @@ func (s *Server) ServeTCP() error {
 func (s *Server) transferFile(conn net.Conn) {
 	defer conn.Close()
 	tarStream := tar.NewReader(conn)
-	header, err := tarStream.Next()
-	if err != nil {
-		s.Logger.Println(err)
-		return
-	}
 
-	filePath := filepath.Join(s.destDir, header.FileInfo().Name())
-	s.Logger.Printf("saving file to %s", filePath)
+	for {
+		header, err := tarStream.Next()
+		if err == io.EOF {
+			return
+		}
+		if err != nil {
+			s.Logger.Println(err)
+			return
+		}
 
-	file, err := os.Create(filePath)
-	if err != nil {
-		s.Logger.Println(err)
-		return
-	}
-	defer file.Close()
+		filePath := filepath.Join(s.destDir, header.Name)
+		if err = os.MkdirAll(filepath.Dir(filePath), 0755); err != nil {
+			s.Logger.Println(err)
+			return
+		}
+		s.Logger.Printf("saving file to %s", filePath)
 
-	_, err = io.Copy(file, tarStream)
-	if err != nil {
-		s.Logger.Println(err)
-		return
+		file, err := os.Create(filePath)
+		if err != nil {
+			s.Logger.Println(err)
+			return
+		}
+		defer file.Close()
+
+		_, err = io.Copy(file, tarStream)
+		if err != nil {
+			s.Logger.Println(err)
+			return
+		}
 	}
 }
