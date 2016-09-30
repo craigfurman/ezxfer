@@ -33,21 +33,20 @@ func (s *Server) ServeTCP() error {
 		if err != nil {
 			return err
 		}
-		go s.transferFile(conn)
+		go s.receiveFiles(conn)
 	}
 }
 
-func (s *Server) transferFile(conn net.Conn) {
+func (s *Server) receiveFiles(conn net.Conn) {
 	defer conn.Close()
 	tarStream := tar.NewReader(conn)
 
 	for {
 		header, err := tarStream.Next()
-		if err == io.EOF {
-			return
-		}
 		if err != nil {
-			s.Logger.Println(err)
+			if err != io.EOF {
+				s.Logger.Println(err)
+			}
 			return
 		}
 
@@ -56,17 +55,15 @@ func (s *Server) transferFile(conn net.Conn) {
 			s.Logger.Println(err)
 			return
 		}
-		s.Logger.Printf("saving file to %s", filePath)
 
+		s.Logger.Printf("saving file to %s", filePath)
 		file, err := os.Create(filePath)
 		if err != nil {
 			s.Logger.Println(err)
 			return
 		}
 		defer file.Close()
-
-		_, err = io.Copy(file, tarStream)
-		if err != nil {
+		if _, err := io.Copy(file, tarStream); err != nil {
 			s.Logger.Println(err)
 			return
 		}

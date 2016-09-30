@@ -23,13 +23,13 @@ func SendFile(filePath, address string) error {
 	}
 
 	if info.IsDir() {
-		return handleDirectory(filePath, tarStream)
+		return sendDir(filePath, tarStream)
 	}
 
-	return handleSingleFile(filepath.Dir(filePath), filePath, tarStream)
+	return sendFile(filepath.Dir(filePath), filePath, tarStream)
 }
 
-func handleSingleFile(basePath string, filePath string, tarStream *tar.Writer) error {
+func sendFile(basePath string, filePath string, tarStream *tar.Writer) error {
 	file, err := os.Open(filePath)
 	if err != nil {
 		return err
@@ -45,7 +45,7 @@ func handleSingleFile(basePath string, filePath string, tarStream *tar.Writer) e
 		return err
 	}
 
-	header, err := tar.FileInfoHeader(fileInfo, "I am not needed")
+	header, err := tar.FileInfoHeader(fileInfo, "What even is this? It seems to make no difference")
 	if err != nil {
 		return err
 	}
@@ -61,7 +61,7 @@ func handleSingleFile(basePath string, filePath string, tarStream *tar.Writer) e
 	return nil
 }
 
-func handleDirectory(filePath string, tarStream *tar.Writer) error {
+func sendDir(filePath string, tarStream *tar.Writer) error {
 	return filepath.Walk(filePath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -71,6 +71,6 @@ func handleDirectory(filePath string, tarStream *tar.Writer) error {
 			return nil
 		}
 
-		return handleSingleFile(filePath, path, tarStream)
+		return sendFile(filePath, path, tarStream)
 	})
 }
