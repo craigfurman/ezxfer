@@ -156,6 +156,11 @@
 			"Rev": "a408501be4d17ee978c04a618e7a1b22af058c0e"
 		},
 		{
+			"ImportPath": "gopkg.in/cheggaaa/pb.v1",
+			"Comment": "v1.0.5",
+			"Rev": "9453b2db37f4d8bc63751daca63bbe7049eb5e74"
+		},
+		{
 			"ImportPath": "gopkg.in/yaml.v2",
 			"Rev": "a5b47d31c556af34a302ce5d659e6fea44d90de0"
 		}

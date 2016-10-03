@@ -6,6 +6,8 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+
+	pb "gopkg.in/cheggaaa/pb.v1"
 )
 
 func SendFile(filePath, address string) error {
@@ -45,6 +47,11 @@ func sendFile(basePath string, filePath string, tarStream *tar.Writer) error {
 		return err
 	}
 
+	progressBar := pb.New64(fileInfo.Size()).SetUnits(pb.U_BYTES)
+	progressBar.Start()
+	progressTrackingFileReader := progressBar.NewProxyReader(file)
+	defer progressBar.Finish()
+
 	header, err := tar.FileInfoHeader(fileInfo, "What even is this? It seems to make no difference")
 	if err != nil {
 		return err
@@ -54,7 +61,7 @@ func sendFile(basePath string, filePath string, tarStream *tar.Writer) error {
 		return err
 	}
 
-	if _, err := io.Copy(tarStream, file); err != nil {
+	if _, err := io.Copy(tarStream, progressTrackingFileReader); err != nil {
 		return err
 	}
 
