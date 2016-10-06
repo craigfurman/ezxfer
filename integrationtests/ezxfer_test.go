@@ -1,7 +1,9 @@
 package integrationtests
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net"
 	"os"
@@ -14,11 +16,19 @@ import (
 )
 
 func createFile(content string, nameParts ...string) error {
-	fullPath := filepath.Join(nameParts...)
-	if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
+	fullPath, err := ensureDirExists(nameParts)
+	if err != nil {
 		return err
 	}
 	return ioutil.WriteFile(fullPath, []byte(content), 0644)
+}
+
+func ensureDirExists(nameParts []string) (string, error) {
+	fullPath := filepath.Join(nameParts...)
+	if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
+		return "", err
+	}
+	return fullPath, nil
 }
 
 func readFile(nameParts ...string) (string, error) {
@@ -36,6 +46,7 @@ var _ = Describe("transferring files", func() {
 		serverPort    = 45454
 		serverProcess *gexec.Session
 		sourceFiles   string
+		clientStdout  *bytes.Buffer
 	)
 
 	BeforeEach(func() {
@@ -60,7 +71,8 @@ var _ = Describe("transferring files", func() {
 
 	JustBeforeEach(func() {
 		clientCmd := exec.Command(binPath, "-file", sourceFiles, "-dstHost", "localhost", fmt.Sprintf("-dstPort=%d", serverPort))
-		clientProcess, err := gexec.Start(clientCmd, GinkgoWriter, GinkgoWriter)
+		clientStdout = new(bytes.Buffer)
+		clientProcess, err := gexec.Start(clientCmd, io.MultiWriter(clientStdout, GinkgoWriter), GinkgoWriter)
 		Expect(err).NotTo(HaveOccurred())
 		Eventually(clientProcess).Should(gexec.Exit(0))
 	})
@@ -85,6 +97,10 @@ var _ = Describe("transferring files", func() {
 			actualContent, err := ioutil.ReadFile(filepath.Join(destDir, fileName))
 			Expect(err).NotTo(HaveOccurred())
 			Expect(string(actualContent)).To(Equal(fileContent))
+		})
+
+		It("shows a progress bar", func() {
+			Expect(clientStdout.String()).To(ContainSubstring("100.00%"))
 		})
 	})
 
