@@ -2,6 +2,8 @@ package client
 
 import (
 	"archive/tar"
+	"crypto/md5"
+	"encoding/hex"
 	"io"
 	"net"
 	"os"
@@ -57,6 +59,13 @@ func sendFile(basePath string, filePath string, tarStream *tar.Writer) error {
 		return err
 	}
 	header.Name = relativePath
+
+	md5Checksum, err := checksum(filePath)
+	if err != nil {
+		return err
+	}
+	header.Xattrs = map[string]string{"md5": md5Checksum}
+
 	if err := tarStream.WriteHeader(header); err != nil {
 		return err
 	}
@@ -80,4 +89,20 @@ func sendDir(filePath string, tarStream *tar.Writer) error {
 
 		return sendFile(filePath, path, tarStream)
 	})
+}
+
+func checksum(filePath string) (string, error) {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+
+	md5Writer := md5.New()
+
+	if _, err := io.Copy(md5Writer, file); err != nil {
+		return "", err
+	}
+
+	return hex.EncodeToString(md5Writer.Sum(nil)), nil
 }

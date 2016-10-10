@@ -10,26 +10,11 @@ import (
 	"os/exec"
 	"path/filepath"
 
+	"github.com/craigfurman/ezxfer/testhelpers"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gexec"
 )
-
-func createFile(content string, nameParts ...string) error {
-	fullPath, err := ensureDirExists(nameParts)
-	if err != nil {
-		return err
-	}
-	return ioutil.WriteFile(fullPath, []byte(content), 0644)
-}
-
-func ensureDirExists(nameParts []string) (string, error) {
-	fullPath := filepath.Join(nameParts...)
-	if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
-		return "", err
-	}
-	return fullPath, nil
-}
 
 func readFile(nameParts ...string) (string, error) {
 	actualContent, err := ioutil.ReadFile(filepath.Join(nameParts...))
@@ -90,7 +75,7 @@ var _ = Describe("transferring files", func() {
 
 		BeforeEach(func() {
 			sourceFiles = filepath.Join(tempDir, fileName)
-			Expect(createFile(fileContent, sourceFiles)).To(Succeed())
+			Expect(testhelpers.CreateFile(fileContent, sourceFiles)).To(Succeed())
 		})
 
 		It("transfers files", func() {
@@ -107,9 +92,9 @@ var _ = Describe("transferring files", func() {
 	Context("when the source is a directory, not a file", func() {
 		BeforeEach(func() {
 			sourceFiles = filepath.Join(tempDir, "some-src")
-			Expect(createFile("content for a.txt", sourceFiles, "a.txt")).To(Succeed())
-			Expect(createFile("content for b.txt", sourceFiles, "d1", "b.txt")).To(Succeed())
-			Expect(createFile("content for c.txt", sourceFiles, "d1", "d2", "c.txt")).To(Succeed())
+			Expect(testhelpers.CreateFile("content for a.txt", sourceFiles, "a.txt")).To(Succeed())
+			Expect(testhelpers.CreateFile("content for b.txt", sourceFiles, "d1", "b.txt")).To(Succeed())
+			Expect(testhelpers.CreateFile("content for c.txt", sourceFiles, "d1", "d2", "c.txt")).To(Succeed())
 		})
 
 		It("transfers the directory", func() {
