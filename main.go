@@ -8,6 +8,8 @@ import (
 
 	"github.com/craigfurman/ezxfer/client"
 	"github.com/craigfurman/ezxfer/server"
+
+	pb "gopkg.in/cheggaaa/pb.v1"
 )
 
 func main() {
@@ -28,9 +30,11 @@ func main() {
 		}
 	}
 
+	c := client.Client{ProgressBarFactory: &progressBarFactory{}}
+
 	logger := createLogger("[ezxfer] ")
 	logger.Printf("will transfer file %s to %s:%d...\n", *file, *dstHost, *dstPort)
-	if err := client.SendFile(*file, fmt.Sprintf("%s:%d", *dstHost, *dstPort)); err != nil {
+	if err := c.Send(*file, fmt.Sprintf("%s:%d", *dstHost, *dstPort)); err != nil {
 		logger.Println(err)
 		os.Exit(1)
 	}
@@ -40,4 +44,10 @@ func main() {
 
 func createLogger(prefix string) *log.Logger {
 	return log.New(os.Stdout, prefix, log.LstdFlags)
+}
+
+type progressBarFactory struct{}
+
+func (*progressBarFactory) New(fileSize int64) client.ProgressBar {
+	return pb.New64(fileSize).SetUnits(pb.U_BYTES).Start()
 }

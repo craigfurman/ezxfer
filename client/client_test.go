@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 
 	"github.com/craigfurman/ezxfer/client"
+	"github.com/craigfurman/ezxfer/client/fakes"
 	"github.com/craigfurman/ezxfer/testhelpers"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -18,9 +19,18 @@ var _ = Describe("sending files", func() {
 	var (
 		tempDir  string
 		listener net.Listener
+
+		progressBarFactory *fakes.FakeProgressBarFactory
+		progressBar        *fakes.FakeProgressBar
+		c                  *client.Client
 	)
 
 	BeforeEach(func() {
+		progressBarFactory = new(fakes.FakeProgressBarFactory)
+		progressBar = fakes.NewFakeProgressBar()
+		progressBarFactory.NewReturns(progressBar)
+		c = &client.Client{ProgressBarFactory: progressBarFactory}
+
 		var err error
 		tempDir, err = ioutil.TempDir("", "ezxfer-tests")
 		Expect(err).NotTo(HaveOccurred())
@@ -38,7 +48,7 @@ var _ = Describe("sending files", func() {
 		errs := make(chan error)
 
 		go func() {
-			errs <- client.SendFile(filepath.Join(tempDir), "127.0.0.1:45454")
+			errs <- c.Send(filepath.Join(tempDir), "127.0.0.1:45454")
 		}()
 
 		conn, err := listener.Accept()
@@ -59,5 +69,10 @@ var _ = Describe("sending files", func() {
 		Expect(err).To(MatchError(io.EOF))
 
 		Expect(<-errs).NotTo(HaveOccurred())
+
+		Expect(progressBarFactory.NewCallCount()).To(Equal(1))
+		Expect(progressBarFactory.NewArgsForCall(0)).To(Equal(int64(13)))
+		Expect(progressBar.String()).To(Equal("some content\n"))
+		Expect(progressBar.FinishCallCount()).To(Equal(1))
 	})
 })

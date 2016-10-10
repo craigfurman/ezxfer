@@ -8,11 +8,23 @@ import (
 	"net"
 	"os"
 	"path/filepath"
-
-	pb "gopkg.in/cheggaaa/pb.v1"
 )
 
-func SendFile(filePath, address string) error {
+type Client struct {
+	ProgressBarFactory ProgressBarFactory
+}
+
+//go:generate counterfeiter -o fakes/fake_progress_bar_factory.go . ProgressBarFactory
+type ProgressBarFactory interface {
+	New(fileSize int64) ProgressBar
+}
+
+type ProgressBar interface {
+	io.Writer
+	Finish()
+}
+
+func (c *Client) Send(filePath, address string) error {
 	conn, err := net.Dial("tcp", address)
 	if err != nil {
 		return err
@@ -27,13 +39,13 @@ func SendFile(filePath, address string) error {
 	}
 
 	if info.IsDir() {
-		return sendDir(filePath, tarStream)
+		return c.sendDir(filePath, tarStream)
 	}
 
-	return sendFile(filepath.Dir(filePath), filePath, tarStream)
+	return c.sendFile(filepath.Dir(filePath), filePath, tarStream)
 }
 
-func sendFile(basePath string, filePath string, tarStream *tar.Writer) error {
+func (c *Client) sendFile(basePath string, filePath string, tarStream *tar.Writer) error {
 	file, err := os.Open(filePath)
 	if err != nil {
 		return err
@@ -49,9 +61,8 @@ func sendFile(basePath string, filePath string, tarStream *tar.Writer) error {
 		return err
 	}
 
-	progressBar := pb.New64(fileInfo.Size()).SetUnits(pb.U_BYTES)
-	progressBar.Start()
-	progressTrackingFileReader := progressBar.NewProxyReader(file)
+	progressBar := c.ProgressBarFactory.New(fileInfo.Size())
+	progressTrackingFileReader := io.TeeReader(file, progressBar)
 	defer progressBar.Finish()
 
 	header, err := tar.FileInfoHeader(fileInfo, "What even is this? It seems to make no difference")
@@ -77,7 +88,7 @@ func sendFile(basePath string, filePath string, tarStream *tar.Writer) error {
 	return nil
 }
 
-func sendDir(filePath string, tarStream *tar.Writer) error {
+func (c *Client) sendDir(filePath string, tarStream *tar.Writer) error {
 	return filepath.Walk(filePath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -87,7 +98,7 @@ func sendDir(filePath string, tarStream *tar.Writer) error {
 			return nil
 		}
 
-		return sendFile(filePath, path, tarStream)
+		return c.sendFile(filePath, path, tarStream)
 	})
 }
 
