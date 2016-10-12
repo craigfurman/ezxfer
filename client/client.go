@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 )
 
+const MD5_ATTRIBUTE_KEY = "md5"
+
 type Client struct {
 	ProgressBarFactory ProgressBarFactory
 }
@@ -75,7 +77,7 @@ func (c *Client) sendFile(basePath string, filePath string, tarStream *tar.Write
 	if err != nil {
 		return err
 	}
-	header.Xattrs = map[string]string{"md5": md5Checksum}
+	header.Xattrs = map[string]string{MD5_ATTRIBUTE_KEY: md5Checksum}
 
 	if err := tarStream.WriteHeader(header); err != nil {
 		return err

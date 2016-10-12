@@ -59,7 +59,7 @@ var _ = Describe("sending files", func() {
 		header, err := tarStream.Next()
 		Expect(err).NotTo(HaveOccurred())
 		Expect(header.Name).To(Equal("subdirectory/a_file.txt"))
-		Expect(header.Xattrs["md5"]).To(Equal("eb9c2bf0eb63f3a7bc0ea37ef18aeba5"))
+		Expect(header.Xattrs[client.MD5_ATTRIBUTE_KEY]).To(Equal("eb9c2bf0eb63f3a7bc0ea37ef18aeba5"))
 
 		content, err := ioutil.ReadAll(tarStream)
 		Expect(err).NotTo(HaveOccurred())
