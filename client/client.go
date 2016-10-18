@@ -2,6 +2,7 @@ package client
 
 import (
 	"archive/tar"
+	"compress/gzip"
 	"crypto/md5"
 	"encoding/hex"
 	"errors"
@@ -29,13 +30,18 @@ type ProgressBar interface {
 	Finish()
 }
 
-func (c *Client) Send(filePath, address string) error {
+func (c *Client) Send(filePath, address string, compress bool) error {
 	conn, err := net.Dial("tcp", address)
 	if err != nil {
 		return err
 	}
 
-	tarStream := tar.NewWriter(conn)
+	var networkWriter io.WriteCloser = conn
+	if compress {
+		networkWriter = gzip.NewWriter(conn)
+	}
+
+	tarStream := tar.NewWriter(networkWriter)
 	defer conn.Close()
 
 	info, err := os.Stat(filePath)
@@ -52,6 +58,13 @@ func (c *Client) Send(filePath, address string) error {
 			return err
 		}
 	}
+
+	if compress {
+		if err := networkWriter.Close(); err != nil {
+			return err
+		}
+	}
+
 	if err := tarStream.Close(); err != nil {
 		return fmt.Errorf("error closing tar stream: %s", err)
 	}

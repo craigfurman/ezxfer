@@ -30,10 +30,12 @@ var _ = Describe("transferring files", func() {
 		serverPort    = 45454
 		serverProcess *gexec.Session
 		sourceFiles   string
+		compress      bool
 		clientStdout  *bytes.Buffer
 	)
 
 	BeforeEach(func() {
+		compress = false
 		var err error
 		tempDir, err = ioutil.TempDir("", "ezxfer-tests")
 		Expect(err).NotTo(HaveOccurred())
@@ -47,7 +49,12 @@ var _ = Describe("transferring files", func() {
 	})
 
 	JustBeforeEach(func() {
-		clientCmd := exec.Command(binPath, "-file", sourceFiles, "-dstHost", "localhost", fmt.Sprintf("-dstPort=%d", serverPort))
+		clientCmdArgs := []string{"-file", sourceFiles, "-dstHost", "localhost", fmt.Sprintf("-dstPort=%d", serverPort)}
+		if compress {
+			clientCmdArgs = append(clientCmdArgs, "-compress")
+		}
+
+		clientCmd := exec.Command(binPath, clientCmdArgs...)
 		clientStdout = new(bytes.Buffer)
 		clientProcess, err := gexec.Start(clientCmd, io.MultiWriter(clientStdout, GinkgoWriter), GinkgoWriter)
 		Expect(err).NotTo(HaveOccurred())
@@ -78,6 +85,18 @@ var _ = Describe("transferring files", func() {
 
 		It("shows a progress bar", func() {
 			Expect(clientStdout.String()).To(ContainSubstring("100.00%"))
+		})
+
+		Context("when compression is enabled", func() {
+			BeforeEach(func() {
+				compress = true
+			})
+
+			It("transfers files", func() {
+				actualContent, err := ioutil.ReadFile(filepath.Join(destDir, fileName))
+				Expect(err).NotTo(HaveOccurred())
+				Expect(string(actualContent)).To(Equal(fileContent))
+			})
 		})
 	})
 

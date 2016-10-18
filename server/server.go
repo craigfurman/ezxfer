@@ -14,9 +14,10 @@ import (
 )
 
 type Server struct {
-	Port    int
-	DestDir string
-	Logger  *log.Logger
+	Port               int
+	DestDir            string
+	CompressionEnabled bool
+	Logger             *log.Logger
 }
 
 type acceptedConnection struct {

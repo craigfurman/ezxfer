@@ -17,6 +17,7 @@ func main() {
 	file := flag.String("file", "", "")
 	dstHost := flag.String("dstHost", "", "")
 	dstPort := flag.Int("dstPort", 0, "")
+	compress := flag.Bool("compress", false, "")
 
 	serverPort := flag.Int("serveOnPort", 0, "")
 	flag.Parse()
@@ -30,7 +31,7 @@ func main() {
 			os.Exit(1)
 		}
 
-		srv := server.Server{Port: *serverPort, DestDir: cwd, Logger: logger}
+		srv := server.Server{Port: *serverPort, DestDir: cwd, CompressionEnabled: *compress, Logger: logger}
 		if err := srv.ServeTCP(context.Background()); err != nil {
 			logger.Println(err)
 			os.Exit(1)
@@ -41,7 +42,7 @@ func main() {
 
 	logger := createLogger("[ezxfer] ")
 	logger.Printf("will transfer file %s to %s:%d...\n", *file, *dstHost, *dstPort)
-	if err := c.Send(*file, fmt.Sprintf("%s:%d", *dstHost, *dstPort)); err != nil {
+	if err := c.Send(*file, fmt.Sprintf("%s:%d", *dstHost, *dstPort), *compress); err != nil {
 		logger.Println(err)
 		os.Exit(1)
 	}
