@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -44,14 +43,7 @@ var _ = Describe("transferring files", func() {
 		serverCmd.Dir = destDir
 		serverProcess, err = gexec.Start(serverCmd, GinkgoWriter, GinkgoWriter)
 		Expect(err).NotTo(HaveOccurred())
-		Eventually(func() bool {
-			conn, err := net.Dial("tcp", fmt.Sprintf("localhost:%d", serverPort))
-			if err != nil {
-				return false
-			}
-			conn.Close()
-			return true
-		}).Should(BeTrue())
+		Eventually(testhelpers.IsListening(fmt.Sprintf("localhost:%d", serverPort))).Should(BeTrue())
 	})
 
 	JustBeforeEach(func() {

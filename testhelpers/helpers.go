@@ -2,6 +2,7 @@ package testhelpers
 
 import (
 	"io/ioutil"
+	"net"
 	"os"
 	"path/filepath"
 )
@@ -20,4 +21,15 @@ func ensureDirExists(nameParts []string) (string, error) {
 		return "", err
 	}
 	return fullPath, nil
+}
+
+func IsListening(address string) func() bool {
+	return func() bool {
+		conn, err := net.Dial("tcp", address)
+		if err != nil {
+			return false
+		}
+		conn.Close()
+		return true
+	}
 }

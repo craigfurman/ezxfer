@@ -2,6 +2,7 @@ package client_test
 
 import (
 	"archive/tar"
+	"bufio"
 	"io"
 	"io/ioutil"
 	"net"
@@ -44,35 +45,74 @@ var _ = Describe("sending files", func() {
 		Expect(os.RemoveAll(tempDir)).To(Succeed())
 	})
 
-	It("sends a tar stream", func() {
-		errs := make(chan error)
+	Context("when the server replies OK after receiving the tar stream", func() {
+		It("send the files to the server", func() {
+			errs := make(chan error)
 
-		go func() {
-			errs <- c.Send(filepath.Join(tempDir), "127.0.0.1:45454")
-		}()
+			go func() {
+				errs <- c.Send(filepath.Join(tempDir), "127.0.0.1:45454")
+			}()
 
-		conn, err := listener.Accept()
-		Expect(err).NotTo(HaveOccurred())
-		defer conn.Close()
+			conn, err := listener.Accept()
+			Expect(err).NotTo(HaveOccurred())
+			defer conn.Close()
 
-		tarStream := tar.NewReader(conn)
-		header, err := tarStream.Next()
-		Expect(err).NotTo(HaveOccurred())
-		Expect(header.Name).To(Equal("subdirectory/a_file.txt"))
-		Expect(header.Xattrs[client.MD5_ATTRIBUTE_KEY]).To(Equal("eb9c2bf0eb63f3a7bc0ea37ef18aeba5"))
+			tarStream := tar.NewReader(conn)
+			header, err := tarStream.Next()
+			Expect(err).NotTo(HaveOccurred())
+			Expect(header.Name).To(Equal("subdirectory/a_file.txt"))
+			Expect(header.Xattrs[client.MD5_ATTRIBUTE_KEY]).To(Equal("eb9c2bf0eb63f3a7bc0ea37ef18aeba5"))
 
-		content, err := ioutil.ReadAll(tarStream)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(string(content)).To(Equal("some content\n"))
+			content, err := ioutil.ReadAll(tarStream)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(string(content)).To(Equal("some content\n"))
 
-		_, err = tarStream.Next()
-		Expect(err).To(MatchError(io.EOF))
+			_, err = tarStream.Next()
+			Expect(err).To(MatchError(io.EOF))
 
-		Expect(<-errs).NotTo(HaveOccurred())
+			connWriter := bufio.NewWriter(conn)
+			_, err = connWriter.WriteString("OK")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(connWriter.Flush()).To(Succeed())
+			Expect(conn.Close()).To(Succeed())
 
-		Expect(progressBarFactory.NewCallCount()).To(Equal(1))
-		Expect(progressBarFactory.NewArgsForCall(0)).To(Equal(int64(13)))
-		Expect(progressBar.String()).To(Equal("some content\n"))
-		Expect(progressBar.FinishCallCount()).To(Equal(1))
+			Expect(<-errs).NotTo(HaveOccurred())
+
+			Expect(progressBarFactory.NewCallCount()).To(Equal(1))
+			Expect(progressBarFactory.NewArgsForCall(0)).To(Equal(int64(13)))
+			Expect(progressBar.String()).To(Equal("some content\n"))
+			Expect(progressBar.FinishCallCount()).To(Equal(1))
+		})
+	})
+
+	Context("when the server replies with an error afer receiving the tar stream", func() {
+		It("returns an error", func() {
+			errs := make(chan error)
+
+			go func() {
+				errs <- c.Send(filepath.Join(tempDir), "127.0.0.1:45454")
+			}()
+
+			conn, err := listener.Accept()
+			Expect(err).NotTo(HaveOccurred())
+			defer conn.Close()
+
+			tarStream := tar.NewReader(conn)
+			_, err = tarStream.Next()
+			Expect(err).NotTo(HaveOccurred())
+			_, err = ioutil.ReadAll(tarStream)
+			Expect(err).NotTo(HaveOccurred())
+			_, err = tarStream.Next()
+			Expect(err).To(MatchError(io.EOF))
+
+			connWriter := bufio.NewWriter(conn)
+			errMsg := "something went wrong"
+			_, err = connWriter.WriteString(errMsg)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(connWriter.Flush()).To(Succeed())
+			Expect(conn.Close()).To(Succeed())
+
+			Expect(<-errs).To(MatchError(errMsg))
+		})
 	})
 })

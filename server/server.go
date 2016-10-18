@@ -2,6 +2,9 @@ package server
 
 import (
 	"archive/tar"
+	"context"
+	"crypto/md5"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"log"
@@ -12,28 +15,39 @@ import (
 
 type Server struct {
 	Port    int
+	DestDir string
 	Logger  *log.Logger
-	destDir string
 }
 
-func (s *Server) ServeTCP() error {
-	var err error
-	s.destDir, err = os.Getwd()
-	if err != nil {
-		return err
-	}
+type acceptedConnection struct {
+	conn net.Conn
+	err  error
+}
 
+func (s *Server) ServeTCP(ctx context.Context) error {
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", s.Port))
 	if err != nil {
 		return err
 	}
+	defer listener.Close()
+
+	connChan := make(chan acceptedConnection)
 
 	for {
-		conn, err := listener.Accept()
-		if err != nil {
-			return err
+		go func() {
+			conn, err := listener.Accept()
+			connChan <- acceptedConnection{conn: conn, err: err}
+		}()
+
+		select {
+		case connection := <-connChan:
+			if connection.err != nil {
+				return connection.err
+			}
+			go s.receiveFiles(connection.conn)
+		case <-ctx.Done():
+			return ctx.Err()
 		}
-		go s.receiveFiles(conn)
 	}
 }
 
@@ -46,11 +60,12 @@ func (s *Server) receiveFiles(conn net.Conn) {
 		if err != nil {
 			if err != io.EOF {
 				s.Logger.Println(err)
+				return
 			}
-			return
+			break
 		}
 
-		filePath := filepath.Join(s.destDir, header.Name)
+		filePath := filepath.Join(s.DestDir, header.Name)
 		if err = os.MkdirAll(filepath.Dir(filePath), 0755); err != nil {
 			s.Logger.Println(err)
 			return
@@ -63,9 +78,28 @@ func (s *Server) receiveFiles(conn net.Conn) {
 			return
 		}
 		defer file.Close()
-		if _, err := io.Copy(file, tarStream); err != nil {
+
+		checksumWriter := md5.New()
+		fileAndChecksum := io.MultiWriter(file, checksumWriter)
+
+		if _, err := io.Copy(fileAndChecksum, tarStream); err != nil {
 			s.Logger.Println(err)
 			return
 		}
+
+		md5Sum := hex.EncodeToString(checksumWriter.Sum(nil))
+		expectedMd5Sum := header.Xattrs["md5"]
+		if md5Sum != expectedMd5Sum {
+			msg := fmt.Sprintf("md5 does not match: expected %s, got %s", expectedMd5Sum, md5Sum)
+			s.Logger.Println(msg)
+			if _, err := conn.Write([]byte(msg)); err != nil {
+				s.Logger.Println(err)
+			}
+			return
+		}
+	}
+
+	if _, err := conn.Write([]byte("OK")); err != nil {
+		s.Logger.Println(err)
 	}
 }

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"log"
@@ -23,8 +24,14 @@ func main() {
 	if *serverPort != 0 {
 		logger := createLogger("[ezxfer server] ")
 		logger.Println("-serveOnPort is set, starting in server mode")
-		srv := server.Server{Port: *serverPort, Logger: logger}
-		if err := srv.ServeTCP(); err != nil {
+		cwd, err := os.Getwd()
+		if err != nil {
+			logger.Println(err)
+			os.Exit(1)
+		}
+
+		srv := server.Server{Port: *serverPort, DestDir: cwd, Logger: logger}
+		if err := srv.ServeTCP(context.Background()); err != nil {
 			logger.Println(err)
 			os.Exit(1)
 		}

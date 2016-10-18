@@ -4,7 +4,10 @@ import (
 	"archive/tar"
 	"crypto/md5"
 	"encoding/hex"
+	"errors"
+	"fmt"
 	"io"
+	"io/ioutil"
 	"net"
 	"os"
 	"path/filepath"
@@ -33,7 +36,7 @@ func (c *Client) Send(filePath, address string) error {
 	}
 
 	tarStream := tar.NewWriter(conn)
-	defer tarStream.Close()
+	defer conn.Close()
 
 	info, err := os.Stat(filePath)
 	if err != nil {
@@ -41,10 +44,28 @@ func (c *Client) Send(filePath, address string) error {
 	}
 
 	if info.IsDir() {
-		return c.sendDir(filePath, tarStream)
+		if err := c.sendDir(filePath, tarStream); err != nil {
+			return err
+		}
+	} else {
+		if err := c.sendFile(filepath.Dir(filePath), filePath, tarStream); err != nil {
+			return err
+		}
+	}
+	if err := tarStream.Close(); err != nil {
+		return fmt.Errorf("error closing tar stream: %s", err)
 	}
 
-	return c.sendFile(filepath.Dir(filePath), filePath, tarStream)
+	reply, err := ioutil.ReadAll(conn)
+	if err != nil {
+		return fmt.Errorf("error reading reply: %s", err)
+	}
+
+	if string(reply) == "OK" {
+		return nil
+	}
+
+	return errors.New(string(reply))
 }
 
 func (c *Client) sendFile(basePath string, filePath string, tarStream *tar.Writer) error {
